@@ -1,11 +1,20 @@
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { Nav, MobileNav } from "./Nav";
 
-export async function AppShell({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const [email, setEmail] = useState("Alex");
 
-  const { data } = await supabase.auth.getUser();
-  const email = data.user?.email ?? "Alex";
+  useEffect(() => {
+    const supabase = createClient();
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.email) setEmail(data.user.email);
+    });
+  }, []);
+
   const initial = email[0]?.toUpperCase() ?? "A";
 
   return (
@@ -21,7 +30,6 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="avatar">{initial}</div>
         </div>
-
         {children}
       </main>
       <MobileNav />
