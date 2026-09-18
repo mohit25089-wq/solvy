@@ -1,8 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  let supabaseResponse = NextResponse.next({
+    request,
+  });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,30 +15,43 @@ export async function proxy(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet, headers) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request, headers });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+
+        setAll(cookiesToSet: any, headers: any) {
+          cookiesToSet.forEach(
+            ({ name, value }: { name: string; value: string }) => {
+              request.cookies.set(name, value);
+            }
           );
+
+          supabaseResponse = NextResponse.next({
+            request,
+          });
+
+          cookiesToSet.forEach(
+            ({
+              name,
+              value,
+              options,
+            }: {
+              name: string;
+              value: string;
+              options?: any;
+            }) => {
+              supabaseResponse.cookies.set(name, value, options);
+            }
+          );
+
+          Object.entries(headers).forEach(([key, value]) => {
+            supabaseResponse.headers.set(key, String(value));
+          });
         },
-      },
-    }
+      } as any,
+    } as any
   );
 
-  const { data } = await supabase.auth.getClaims();
-  const isPublic = request.nextUrl.pathname === "/login" ||
-    request.nextUrl.pathname.startsWith("/auth");
+  await supabase.auth.getUser();
 
-  if (!data?.claims && !isPublic) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  if (data?.claims && request.nextUrl.pathname === "/login") {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-
-  return response;
+  return supabaseResponse;
 }
 
 export const config = {
